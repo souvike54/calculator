@@ -1,0 +1,9 @@
+project setup
+ui layout
+display logic 
+core operatioon
+edge cases 
+clear and reset
+keyboard support
+history
+testing
