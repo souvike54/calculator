@@ -1,0 +1,156 @@
+<script>
+    // Grabbing the layout screen references
+    const display = document.getElementById('displayTextView');
+    
+    // State machine variables
+    let firstOperand = null;
+    let pendingOperator = null;
+    let isResettingInput = false;
+    let lastKeyWasOperator = false;
+
+    // Core Event Router listeners for Digit clicks
+    document.querySelectorAll('.btn-digit').forEach(button => {
+        button.addEventListener('click', () => {
+            let key = button.getAttribute('value') || button.innerText.trim();
+            handleDigitInput(key);
+        });
+    });
+
+    // Core Event Router listeners for Operator clicks
+    document.querySelectorAll('.btn-operator').forEach(button => {
+        button.addEventListener('click', () => {
+            let op = button.getAttribute('value') || button.innerText.trim();
+            handleOperatorInput(op);
+        });
+    });
+
+    // Operational Special Actions
+    document.getElementById('btnEquals').addEventListener('click', handleEquals);
+    
+    document.getElementById('btnAC').addEventListener('click', () => {
+        allClear();
+        display.innerText = '0';
+    });
+
+    document.getElementById('btnC').addEventListener('click', () => {
+        // Entry Clear (C): Only drops current visual typed typo string
+        display.innerText = '0';
+        lastKeyWasOperator = false;
+    });
+
+    function handleDigitInput(key) {
+        let currentText = display.innerText;
+
+        if (isResettingInput || currentText === '0' || currentText === 'Error') {
+            currentText = '';
+            isResettingInput = false;
+        }
+
+        // EDGE CASE VALIDATION: Block double period decimal errors (e.g., 3..5)
+        if (key === '.') {
+            if (currentText.includes('.')) return;
+            if (currentText === '') currentText = '0';
+        }
+
+        display.innerText = currentText + key;
+        lastKeyWasOperator = false;
+    }
+
+    function handleOperatorInput(operator) {
+        let currentText = display.innerText;
+        if (currentText === 'Error') return;
+
+        let currentVal = parseFloat(currentText) || 0;
+
+        // EDGE CASE VALIDATION: Consecutive math clicks switch the sign instead of repeating calculations
+        if (lastKeyWasOperator) {
+            pendingOperator = operator;
+            return;
+        }
+
+        if (firstOperand === null) {
+            firstOperand = currentVal;
+        } else if (pendingOperator) {
+            let result = calculate(firstOperand, currentVal, pendingOperator);
+            
+            if (isNaN(result) || !isFinite(result)) {
+                showError();
+                return;
+            }
+            firstOperand = result;
+            display.innerText = formatResult(result);
+        }
+
+        pendingOperator = operator;
+        isResettingInput = true;
+        lastKeyWasOperator = true;
+    }
+
+    function handleEquals() {
+        if (firstOperand === null || !pendingOperator || isResettingInput) return;
+        
+        let currentVal = parseFloat(display.innerText) || 0;
+        let result = calculate(firstOperand, currentVal, pendingOperator);
+
+        if (isNaN(result) || !isFinite(result)) {
+            showError();
+            return;
+        }
+
+        display.innerText = formatResult(result);
+        allClear();
+        firstOperand = result; // Allows chaining the result into consecutive new entries
+        isResettingInput = true;
+    }
+
+    function calculate(op1, op2, operator) {
+        switch (operator) {
+            case '+': return op1 + op2;
+            case '-': return op1 - op2;
+            case '×':
+            case '*': return op1 * op2;
+            case '÷':
+            case '/': 
+                // EDGE CASE VALIDATION: Divide by Zero returns flag trap safely
+                return op2 === 0 ? NaN : op1 / op2;
+            default: return op2;
+        }
+    }
+
+    function formatResult(value) {
+        // Truncate cleanly or omit tail end floating .0 zeroes on round integers
+        return Number(value.toFixed(10)).toString();
+    }
+
+    function showError() {
+        display.innerText = 'Error';
+        allClear();
+        isResettingInput = true;
+    }
+
+    function allClear() {
+        firstOperand = null;
+        pendingOperator = null;
+        isResettingInput = false;
+        lastKeyWasOperator = false;
+    }
+
+    // EXTRA FEATURE: Seamless Physical Desktop Keyboard Support Mapping
+    window.addEventListener('keydown', (e) => {
+        if (e.key >= '0' && e.key <= '9' || e.key === '.') handleDigitInput(e.key);
+        if (e.key === '+' || e.key === '-' || e.key === '*' || e.key === '/') handleOperatorInput(e.key);
+        if (e.key === 'Enter' || e.key === '=') handleEquals();
+        if (e.key === 'Escape') {
+            allClear();
+            display.innerText = '0';
+        }
+        if (e.key === 'Backspace') {
+            let text = display.innerText;
+            if (text.length > 1 && text !== 'Error') {
+                display.innerText = text.slice(0, -1);
+            } else {
+                display.innerText = '0';
+            }
+        }
+    });
+</script>
